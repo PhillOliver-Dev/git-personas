@@ -1,0 +1,66 @@
+{
+  "name": "git-personas",
+  "version": "1.0.0",
+  "description": "Terminal UI for managing git personas — switch between git identities with ease",
+  "main": "dist/cli.js",
+  "bin": {
+    "git-personas": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.tsx",
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint",
+    "prepublishOnly": "npm run check && npm run build",
+    "prepare": "simple-git-hooks"
+  },
+  "keywords": [
+    "git",
+    "persona",
+    "identity",
+    "config",
+    "cli",
+    "terminal",
+    "tui",
+    "ink",
+    "switch",
+    "profile"
+  ],
+  "author": "Phil Oliver",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "dependencies": {
+    "ink": "^5.2.0",
+    "ink-select-input": "^6.0.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.15.21",
+    "@types/react": "^18.3.30",
+    "@typescript-eslint/parser": "^8.60.1",
+    "eslint": "^10.0.1",
+    "react-dom": "^18.3.1",
+    "simple-git-hooks": "^2.13.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.60.1"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npm run check"
+  }
+}
