@@ -38,4 +38,10 @@ export default tseslint.config(
       "no-console": "off",
     },
   },
+  {
+    files: ["src/cli.tsx"],
+    rules: {
+      "no-console": "off",
+    },
+  },
 );

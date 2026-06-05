@@ -38,7 +38,9 @@ You'll see the main menu with all your personas listed and the currently active 
 
 ### First time?
 
-1. Select **➕ Create Persona**
+Your existing git identity is automatically imported as the "default" persona on first launch.
+
+1. Select **➕ Create Persona** to add more
 2. Fill in a name (e.g. `work`, `personal`, `opensource`)
 3. Enter your git user name and email
 4. Optionally pick a GPG signing key (auto-detected from your system)
@@ -55,16 +57,62 @@ Then switch to it with **🔄 Switch Persona**.
 - **Create** personas with name, email, GPG key, SSH key, and default branch
 - **Edit** any field on an existing persona
 - **Delete** personas you no longer need
-- **Switch** between personas — instantly updates your global `~/.gitconfig`
-- **Clear** your active persona (removes all git identity from global config)
+- **Switch** between personas — uses git's native `includeIf` for non-destructive config
+- **Clear** your active persona (removes managed section from global config)
 - **Auto-detection** of GPG and SSH keys from your system
+- **Auto-import** of existing git profile on first launch
 - **📌 Sticky personas** — auto-switch identity per repo via global git hooks
+- **🪝 Pre-push hook** — warns if you're pushing with a different identity than your active persona
+- **📤 Export/Import** — share personas across machines
+- **⚡ Headless CLI** — switch personas from the command line without the TUI
+- **🖥️ Shell prompt** — show active persona in your oh-my-zsh prompt
+- **🧹 Self-cleanup** — hooks remove themselves if git-personas is uninstalled
+
+---
+
+## Headless CLI
+
+In addition to the interactive TUI, you can use git-personas from the command line:
+
+```bash
+# Switch persona without opening the TUI
+git-personas switch work
+
+# Export personas to a file (or stdout)
+git-personas export
+git-personas export ~/my-personas.json
+
+# Import personas from a file
+git-personas import ~/my-personas.json
+
+# Show help
+git-personas --help
+```
+
+---
+
+## Export / Import
+
+Share personas across machines or back them up:
+
+```bash
+# Export to file
+git-personas export ~/backup/personas.json
+
+# Export to stdout (pipe to other tools)
+git-personas export | jq '.[].name'
+
+# Import from file (merges with existing personas)
+git-personas import ~/backup/personas.json
+```
+
+Import skips personas with duplicate names. In a TTY, you'll be prompted to rename or skip. In non-TTY mode, duplicates are silently skipped.
 
 ---
 
 ## 📌 Sticky Personas
 
-Sticky personas automatically manage your git identity on a per-repo basis using a global pre-commit hook.
+Sticky personas automatically manage your git identity on a per-repo basis using global git hooks.
 
 ### How it works
 
@@ -80,7 +128,7 @@ Sticky personas automatically manage your git identity on a per-repo basis using
 2. Select **📌 Sticky Personas** from the main menu
 3. Select **✅ Enable Sticky Personas**
 
-This installs a global pre-commit hook at `~/.config/git-personas/hooks/` and sets `core.hooksPath` in your global git config.
+This installs global hooks (pre-commit + pre-push) at `~/.config/git-personas/hooks/` and sets `core.hooksPath` in your global git config.
 
 ### Disable sticky personas
 
@@ -90,11 +138,32 @@ This installs a global pre-commit hook at `~/.config/git-personas/hooks/` and se
 
 This removes the hooks directory and unsets `core.hooksPath`.
 
-### Where data is stored
+### 🪝 Pre-push identity check
 
-- Persona config: `~/.config/git-personas/personas.json`
-- Repo→persona mapping: `~/.config/git-personas/repo-personas.json`
-- Hook script: `~/.config/git-personas/hooks/pre-commit`
+When sticky personas are enabled, a pre-push hook checks if the identity you're pushing with matches your active persona. If there's a mismatch, you'll be warned and asked to confirm before the push proceeds.
+
+---
+
+## 🖥️ Shell Prompt (oh-my-zsh)
+
+Show your active persona in your terminal prompt:
+
+1. Enable sticky personas (see above) — this copies the zsh snippet to `~/.config/git-personas/git-personas.zsh`
+2. Add to your `~/.zshrc` after oh-my-zsh is sourced:
+
+```bash
+source ~/.config/git-personas/git-personas.zsh
+```
+
+3. Use `$(git_personas_prompt_info)` in your PROMPT. For example, with the default robbyrussell theme:
+
+```bash
+PROMPT='%F{blue}%~%f $(git_personas_prompt_info)$(git_prompt_info)%F{yellow}%(?:→ :✗ )%f '
+```
+
+This will show `👤 persona-name` when a persona is active. The result is cached for 30 seconds to avoid reading the file on every prompt redraw.
+
+**Without oh-my-zsh:** The snippet works standalone — just source it and use `$(git_personas_prompt_info)` in your custom PROMPT.
 
 ---
 
@@ -113,20 +182,38 @@ This removes the hooks directory and unsets `core.hooksPath`.
 
 ## What Gets Changed?
 
-When you switch personas, `git-personas` updates your **global** `~/.gitconfig`:
+When you switch personas, `git-personas` writes a per-persona config file and adds an `includeIf` block to your `~/.gitconfig`:
 
 ```
-user.name          → "Your Name"
-user.email         → "you@example.com"
-user.signingkey    → <gpg key id>       (if set)
-commit.gpgsign     → true               (if GPG key set)
-core.sshCommand    → ssh -i <key path>  (if SSH key set)
-init.defaultBranch → <branch name>       (if set)
+# === BEGIN git-personas managed config ===
+# Active persona: work
+# Managed by git-personas — do not edit between markers
+
+[includeIf "gitdir:~/"]
+  path = ~/.config/git-personas/personas/work.config
+
+# === END git-personas managed config ===
 ```
 
-Fields that aren't set on the persona are **unset** from global config when you switch.
+The per-persona config file at `~/.config/git-personas/personas/<name>.config` contains:
 
-> **💡 Tip:** This only affects global config. Per-repo overrides (set with `git config --local`) always take precedence.
+```
+[user]
+  name = Your Name
+  email = you@example.com
+  signingkey = <gpg key id>        (if set)
+
+[commit]
+  gpgsign = true                    (if GPG key set)
+
+[core]
+  sshCommand = ssh -i <key path>   (if SSH key set)
+
+[init]
+  defaultBranch = <branch name>     (if set)
+```
+
+> **💡 Tip:** Using `includeIf` is non-destructive — your existing `~/.gitconfig` entries outside the managed section are untouched. Per-repo overrides (set with `git config --local`) always take precedence.
 
 ---
 
@@ -152,7 +239,9 @@ git config --global user.name && git config --global user.email
 ```
 
 ### Backing up your personas
-Persona data lives at `~/.config/git-personas/personas.json`. Back this up or dotfile it to keep your personas across machines.
+```bash
+git-personas export ~/backup/personas.json
+```
 
 ### Keyboard navigation
 - **↑/↓** — Navigate menu items
@@ -166,7 +255,7 @@ Persona data lives at `~/.config/git-personas/personas.json`. Back this up or do
 
 ```bash
 # Clone the repo
-git clone https://github.com/<your-username>/git-personas.git
+git clone https://github.com/PhillOliver-Dev/git-personas.git
 cd git-personas
 
 # Install dependencies
@@ -195,7 +284,7 @@ npm run build
 | Script | Description |
 |---|---|
 | `npm run dev` | Run in development mode with tsx |
-| `npm run build` | Compile TypeScript to `dist/` |
+| `npm run build` | Compile TypeScript to `dist/` + copy shell scripts |
 | `npm run lint` | Lint source files |
 | `npm run lint:fix` | Lint and auto-fix issues |
 | `npm run typecheck` | TypeScript type checking |
@@ -207,9 +296,25 @@ npm run build
 ## How It Works
 
 1. Persona data is stored in `~/.config/git-personas/personas.json`
-2. On switch, global `~/.gitconfig` is updated via `git config --global`
-3. GPG keys are auto-detected by running `gpg --list-keys --with-colons`
-4. SSH keys are auto-detected by scanning `~/.ssh/` for `id_*` files
+2. Each persona has a config file at `~/.config/git-personas/personas/<name>.config`
+3. On switch, an `includeIf` block in `~/.gitconfig` points to the active persona's config
+4. GPG keys are auto-detected by running `gpg --list-keys --with-colons`
+5. SSH keys are auto-detected by scanning `~/.ssh/` for `id_*` files
+6. Global hooks (pre-commit + pre-push) live at `~/.config/git-personas/hooks/`
+
+---
+
+## Where Data Is Stored
+
+| File | Description |
+|---|---|
+| `~/.config/git-personas/personas.json` | Persona definitions + active state |
+| `~/.config/git-personas/personas/*.config` | Per-persona git config files |
+| `~/.config/git-personas/repo-personas.json` | Repo→persona sticky mappings |
+| `~/.config/git-personas/hooks/pre-commit` | Global pre-commit hook |
+| `~/.config/git-personas/hooks/pre-push` | Global pre-push hook |
+| `~/.config/git-personas/git-personas.zsh` | Shell prompt snippet |
+| `~/.gitconfig` | Managed includeIf section (between markers) |
 
 ---
 

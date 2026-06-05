@@ -35,6 +35,10 @@ export type RepoPersonas = Record<string, RepoPersonaMapping>;
 const CONFIG_DIR = `${os.homedir()}/.config/git-personas`;
 const CONFIG_FILE = `${CONFIG_DIR}/personas.json`;
 const REPO_PERSONAS_FILE = `${CONFIG_DIR}/repo-personas.json`;
+const PERSONAS_CONFIG_DIR = `${CONFIG_DIR}/personas`;
+const GITCONFIG_PATH = `${os.homedir()}/.gitconfig`;
+const MANAGED_SECTION_START = '# === BEGIN git-personas managed config ===';
+const MANAGED_SECTION_END = '# === END git-personas managed config ===';
 
 export function getConfigDir(): string {
   return CONFIG_DIR;
@@ -42,6 +46,14 @@ export function getConfigDir(): string {
 
 export function getRepoPersonasFile(): string {
   return REPO_PERSONAS_FILE;
+}
+
+export function getPersonasConfigDir(): string {
+  return PERSONAS_CONFIG_DIR;
+}
+
+function configFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
 export function getCurrentGitProfile(): Persona | null {
@@ -210,55 +222,161 @@ export function detectSshKeys(): SshKey[] {
   }
 }
 
-export function applyPersona(persona: Persona): void {
-  const commands = [
-    `git config --global user.name "${persona.user}"`,
-    `git config --global user.email "${persona.email}"`,
-  ];
+// --- includeIf-based persona config management ---
+
+export function writePersonaConfigFile(name: string, persona: Persona): void {
+  ensureConfigDir();
+  fs.mkdirSync(PERSONAS_CONFIG_DIR, { recursive: true });
+
+  const lines: string[] = [];
+
+  lines.push('[user]');
+  lines.push(`\tname = ${persona.user}`);
+  lines.push(`\temail = ${persona.email}`);
 
   if (persona.gpgKey) {
-    commands.push(
-      `git config --global user.signingkey ${persona.gpgKey}`,
-      `git config --global commit.gpgsign true`
-    );
-  } else {
-    commands.push(`git config --global --unset commit.gpgsign || true`);
-    commands.push(`git config --global --unset user.signingkey || true`);
+    lines.push(`\tsigningkey = ${persona.gpgKey}`);
+  }
+
+  if (persona.gpgKey) {
+    lines.push('');
+    lines.push('[commit]');
+    lines.push('\tgpgsign = true');
   }
 
   if (persona.sshKey) {
-    commands.push(
-      `git config --global core.sshCommand "ssh -i ${persona.sshKey} -o IdentitiesOnly=yes"`
-    );
-  } else {
-    commands.push(`git config --global --unset core.sshCommand || true`);
+    lines.push('');
+    lines.push('[core]');
+    lines.push(`\tsshCommand = ssh -i ${persona.sshKey} -o IdentitiesOnly=yes`);
   }
 
   if (persona.defaultBranch) {
-    commands.push(
-      `git config --global init.defaultBranch ${persona.defaultBranch}`
-    );
-  } else {
-    commands.push(`git config --global --unset init.defaultBranch || true`);
+    lines.push('');
+    lines.push('[init]');
+    lines.push(`\tdefaultBranch = ${persona.defaultBranch}`);
   }
 
-  for (const cmd of commands) {
-    execSync(cmd, { stdio: 'pipe' });
+  const configPath = `${PERSONAS_CONFIG_DIR}/${configFileName(name)}.config`;
+  fs.writeFileSync(configPath, lines.join('\n') + '\n');
+}
+
+export function deletePersonaConfigFile(name: string): void {
+  const configPath = `${PERSONAS_CONFIG_DIR}/${configFileName(name)}.config`;
+  try {
+    fs.rmSync(configPath, { force: true });
+  } catch {
+    // File doesn't exist or can't be deleted — ignore
   }
 }
 
-export function clearActivePersona(): void {
-  const commands = [
-    `git config --global --unset user.name || true`,
-    `git config --global --unset user.email || true`,
-    `git config --global --unset user.signingkey || true`,
-    `git config --global --unset commit.gpgsign || true`,
-    `git config --global --unset core.sshCommand || true`,
-    `git config --global --unset init.defaultBranch || true`,
-  ];
-  for (const cmd of commands) {
-    execSync(cmd, { stdio: 'pipe' });
+function removeManagedSection(gitconfig: string): string {
+  const startIdx = gitconfig.indexOf(MANAGED_SECTION_START);
+  const endIdx = gitconfig.indexOf(MANAGED_SECTION_END);
+
+  if (startIdx === -1 || endIdx === -1) {
+    return gitconfig;
   }
+
+  const before = gitconfig.substring(0, startIdx);
+  const after = gitconfig.substring(endIdx + MANAGED_SECTION_END.length);
+
+  // Collapse multiple blank lines that result from removal
+  return (before + after).replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+}
+
+function updateGitconfigIncludesForPersona(personaName: string): void {
+  const sanitisedName = configFileName(personaName);
+  const configPath = `~/.config/git-personas/personas/${sanitisedName}.config`;
+
+  let gitconfig = '';
+  try {
+    gitconfig = fs.readFileSync(GITCONFIG_PATH, 'utf-8');
+  } catch {
+    // File doesn't exist yet — that's fine
+  }
+
+  // Remove any existing managed section
+  gitconfig = removeManagedSection(gitconfig);
+
+  // Build the new managed section
+  const section = [
+    '',
+    MANAGED_SECTION_START,
+    `# Active persona: ${personaName}`,
+    `# Managed by git-personas — do not edit between markers`,
+    '',
+    `[includeIf "gitdir:~/"]`,
+    `\tpath = ${configPath}`,
+    '',
+    MANAGED_SECTION_END,
+  ].join('\n');
+
+  const content = gitconfig.trimEnd() + '\n' + section + '\n';
+  fs.writeFileSync(GITCONFIG_PATH, content);
+}
+
+function readGitconfigContent(): string | null {
+  try {
+    return fs.readFileSync(GITCONFIG_PATH, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+function removeGitconfigManagedSection(): void {
+  const gitconfigContent = readGitconfigContent();
+  if (gitconfigContent === null) return;
+
+  const cleaned = removeManagedSection(gitconfigContent);
+  // If there's nothing left, remove the file entirely
+  if (cleaned.trim() === '') {
+    try {
+      fs.rmSync(GITCONFIG_PATH);
+    } catch {
+      // Ignore
+    }
+    return;
+  }
+
+  fs.writeFileSync(GITCONFIG_PATH, cleaned);
+}
+
+function cleanupDirectGitConfig(): void {
+  const unsetCommands = [
+    'git config --global --unset user.name || true',
+    'git config --global --unset user.email || true',
+    'git config --global --unset user.signingkey || true',
+    'git config --global --unset commit.gpgsign || true',
+    'git config --global --unset core.sshCommand || true',
+    'git config --global --unset init.defaultBranch || true',
+  ];
+
+  for (const cmd of unsetCommands) {
+    try {
+      execSync(cmd, { stdio: 'pipe' });
+    } catch {
+      // Value already unset — ignore
+    }
+  }
+}
+
+export function applyPersona(persona: Persona): void {
+  // 1. Write the persona config file
+  writePersonaConfigFile(persona.name, persona);
+
+  // 2. Clean up old direct git config values (migration from pre-includeIf system)
+  cleanupDirectGitConfig();
+
+  // 3. Update the includeIf block in ~/.gitconfig to point to this persona
+  updateGitconfigIncludesForPersona(persona.name);
+}
+
+export function clearActivePersona(): void {
+  // 1. Clean up old direct git config values
+  cleanupDirectGitConfig();
+
+  // 2. Remove the includeIf managed section from ~/.gitconfig
+  removeGitconfigManagedSection();
 }
 
 export function takeSnapshot(persona: Persona): PersonaSnapshot {

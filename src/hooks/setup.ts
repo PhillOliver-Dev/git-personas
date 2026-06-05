@@ -9,12 +9,12 @@ const __dirname = path.dirname(__filename);
 
 const CONFIG_DIR = `${os.homedir()}/.config/git-personas`;
 const HOOKS_DIR = `${CONFIG_DIR}/hooks`;
-const PRE_COMMIT_HOOK = `${HOOKS_DIR}/pre-commit`;
+const ZSH_PROMPT_DEST = `${CONFIG_DIR}/git-personas.zsh`;
 
-// The compiled hook lives at dist/hooks/pre-commit.js relative to this file
-function getBuiltinHookPath(): string {
-  // This file is at dist/hooks/setup.js, so the pre-commit is at dist/hooks/pre-commit.js
-  return path.join(__dirname, 'pre-commit.js');
+const HOOKS = ['pre-commit', 'pre-push'] as const;
+
+function getBuiltinHookPath(hookName: string): string {
+  return path.join(__dirname, `${hookName}.js`);
 }
 
 export function isStickyEnabled(): boolean {
@@ -29,19 +29,26 @@ export function isStickyEnabled(): boolean {
 }
 
 export function installStickyHooks(): void {
-  // Build the hooks directory
   fs.mkdirSync(HOOKS_DIR, { recursive: true });
 
-  // Copy the hook script from the package
-  const source = getBuiltinHookPath();
-  if (!fs.existsSync(source)) {
-    throw new Error(
-      `Built hook not found at ${source}. Run "npm run build" first.`,
-    );
+  for (const hookName of HOOKS) {
+    const source = getBuiltinHookPath(hookName);
+    if (!fs.existsSync(source)) {
+      throw new Error(
+        `Built hook not found at ${source}. Run "npm run build" first.`,
+      );
+    }
+
+    const dest = `${HOOKS_DIR}/${hookName}`;
+    fs.copyFileSync(source, dest);
+    fs.chmodSync(dest, 0o755);
   }
 
-  fs.copyFileSync(source, PRE_COMMIT_HOOK);
-  fs.chmodSync(PRE_COMMIT_HOOK, 0o755);
+  // Copy zsh prompt snippet for easy sourcing
+  const zshSource = path.join(__dirname, '..', 'shell', 'git-personas.zsh');
+  if (fs.existsSync(zshSource)) {
+    fs.copyFileSync(zshSource, ZSH_PROMPT_DEST);
+  }
 
   // Set global hooks path
   execSync(`git config --global core.hooksPath "${HOOKS_DIR}"`, {
@@ -50,14 +57,12 @@ export function installStickyHooks(): void {
 }
 
 export function uninstallStickyHooks(): void {
-  // Remove the hooks directory
   try {
     fs.rmSync(HOOKS_DIR, { recursive: true, force: true });
   } catch {
     // Ignore if directory doesn't exist
   }
 
-  // Unset global hooks path
   try {
     execSync('git config --global --unset core.hooksPath', { stdio: 'pipe' });
   } catch {
