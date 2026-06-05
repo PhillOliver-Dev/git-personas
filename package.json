@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "dev": "tsx src/cli.tsx",
-    "build": "tsc && mkdir -p dist/shell && cp src/shell/git-personas.zsh dist/shell/git-personas.zsh",
+    "build": "tsc && mkdir -p dist/shell && cp src/shell/git-personas.zsh dist/shell/git-personas.zsh && cp src/shell/git-personas.bash dist/shell/git-personas.bash",
     "start": "node dist/cli.js",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
