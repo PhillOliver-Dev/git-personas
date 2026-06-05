@@ -17,12 +17,14 @@ export default function StickyPersonaScreen({ onScreenChange, onQuit }: StickyPe
 
   if (enabled) {
     const items = [
+      { label: '🖥️  Shell Prompt Integration', value: 'shell-prompt' },
       { label: '❌ Disable Sticky Personas', value: 'disable' },
       { label: '🚪 Quit', value: 'quit' },
     ];
 
     const onSelect = (item: { value: string }) => {
       switch (item.value) {
+        case 'shell-prompt': onScreenChange({ type: 'sticky-shell-prompt' }); break;
         case 'disable': {
           try {
             uninstallStickyHooks();

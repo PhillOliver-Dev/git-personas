@@ -7,6 +7,7 @@ export type Screen =
   | { type: 'delete' }
   | { type: 'switch' }
   | { type: 'sticky' }
+  | { type: 'sticky-shell-prompt' }
   | { type: 'success'; message: string };
 
 export type { Persona, PersonaStore };

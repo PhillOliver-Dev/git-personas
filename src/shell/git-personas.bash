@@ -73,3 +73,8 @@ git_personas_clear_cache() {
   _git_personas_cached_result=""
   _git_personas_cached_time=0
 }
+
+# Automatically append to PS1 if not already there
+if [[ -n "${PS1}" && "${PS1}" != *"git_personas_prompt_info"* ]]; then
+  PS1="${PS1}\$(git_personas_prompt_info)"
+fi

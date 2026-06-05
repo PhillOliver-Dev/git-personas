@@ -11,7 +11,14 @@ import {
   getPersona,
   applyPersona,
   setActive,
+  clearActivePersona,
+  getConfigDir,
 } from './store.js';
+import {
+  uninstallStickyHooks,
+  removeShellPrompt,
+} from './hooks/setup.js';
+import type { ShellName } from './hooks/setup.js';
 import App from './index.js';
 
 function printHelp(): void {
@@ -23,12 +30,14 @@ USAGE:
   git-personas switch <name>    Switch to a persona (headless)
   git-personas export [file]    Export personas to JSON file or stdout
   git-personas import <file>    Import personas from a JSON file
+  git-personas uninstall        Remove all git-personas config, hooks, and shell integrations
   git-personas --help           Show this help message
 
 EXAMPLES:
   git-personas switch work
   git-personas export ~/my-personas.json
   git-personas import ~/my-personas.json
+  git-personas uninstall
 `.trim());
 }
 
@@ -152,6 +161,38 @@ function handleSwitch(personaName: string | undefined): void {
   process.exit(0);
 }
 
+function handleUninstall(): void {
+  // 1. Remove managed section from ~/.gitconfig
+  clearActivePersona();
+  console.log('✓ Removed git-personas section from ~/.gitconfig');
+
+  // 2. Remove sticky hooks and core.hooksPath
+  uninstallStickyHooks();
+  console.log('✓ Removed global git hooks');
+
+  // 3. Remove shell prompt integrations
+  for (const shell of ['bash', 'zsh', 'starship'] as ShellName[]) {
+    try {
+      removeShellPrompt(shell);
+    } catch {
+      // Not installed for this shell — skip
+    }
+  }
+  console.log('✓ Removed shell prompt integrations');
+
+  // 4. Remove the entire config directory
+  try {
+    fs.rmSync(getConfigDir(), { recursive: true, force: true });
+    console.log('✓ Removed ~/.config/git-personas/');
+  } catch {
+    // Already gone
+  }
+
+  console.log('\ngit-personas has been completely uninstalled.');
+  console.log('Run "npm uninstall -g git-personas" to remove the CLI.');
+  process.exit(0);
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const command = args[0];
@@ -173,6 +214,11 @@ async function main(): Promise<void> {
 
   if (command === 'switch') {
     handleSwitch(args[1]);
+    return;
+  }
+
+  if (command === 'uninstall') {
+    handleUninstall();
     return;
   }
 

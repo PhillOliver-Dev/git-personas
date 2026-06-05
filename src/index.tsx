@@ -9,6 +9,7 @@ import DeleteScreen from './components/DeleteScreen.js';
 import SwitchScreen from './components/SwitchScreen.js';
 import SuccessScreen from './components/SuccessScreen.js';
 import StickyPersonaScreen from './components/StickyPersonaScreen.js';
+import ShellPromptScreen from './components/ShellPromptScreen.js';
 
 export default function App() {
   const { exit } = useApp();
@@ -21,7 +22,7 @@ export default function App() {
     }
   });
 
-  // Load store once, importing current git profile on first launch
+  // Load store on all screen changes
   const store = useMemo(() => {
     const loaded = loadStore();
     const imported = importCurrentProfile(loaded);
@@ -29,7 +30,7 @@ export default function App() {
       saveStore(imported);
     }
     return imported;
-  }, []);
+  }, [screen]);
 
   switch (screen.type) {
     case 'main':
@@ -102,6 +103,9 @@ export default function App() {
 
     case 'sticky':
       return <StickyPersonaScreen onScreenChange={setScreen} onQuit={exit} />;
+
+    case 'sticky-shell-prompt':
+      return <ShellPromptScreen onScreenChange={setScreen} onQuit={exit} />;
 
     case 'success':
       return (
