@@ -65,8 +65,9 @@ Then switch to it with **🔄 Switch Persona**.
 - **🪝 Pre-push hook** — warns if you're pushing with a different identity than your active persona
 - **📤 Export/Import** — share personas across machines
 - **⚡ Headless CLI** — switch personas from the command line without the TUI
-- **🖥️ Shell prompt** — show active persona in your oh-my-zsh prompt
+- **🖥️ Shell Prompt** — show active persona in bash, zsh, or Starship
 - **🧹 Self-cleanup** — hooks remove themselves if git-personas is uninstalled
+- **🗑️ Uninstall** — complete removal of all config, hooks, and shell integrations
 
 ---
 
@@ -84,6 +85,9 @@ git-personas export ~/my-personas.json
 
 # Import personas from a file
 git-personas import ~/my-personas.json
+
+# Completely remove all git-personas config
+git-personas uninstall
 
 # Show help
 git-personas --help
@@ -144,26 +148,43 @@ When sticky personas are enabled, a pre-push hook checks if the identity you're 
 
 ---
 
-## 🖥️ Shell Prompt (oh-my-zsh)
+## 🖥️ Shell Prompt
 
-Show your active persona in your terminal prompt:
+Show your active persona in your terminal prompt. Three integrations are available:
 
-1. Enable sticky personas (see above) — this copies the zsh snippet to `~/.config/git-personas/git-personas.zsh`
-2. Add to your `~/.zshrc` after oh-my-zsh is sourced:
+### Bash
+
+1. Run `git-personas`
+2. Select **🖥️ Shell Prompt Integration** from the Sticky Personas menu
+3. Toggle **Bash (~/.bashrc)**
+
+This adds `source ~/.config/git-personas/git-personas.bash` to your `~/.bashrc`. The result is cached for 30 seconds to avoid reading the file on every prompt redraw.
+
+**Note:** If you use Starship, the bash PS1 approach won't work — use the Starship integration below instead.
+
+### Zsh
+
+1. Run `git-personas`
+2. Select **🖥️ Shell Prompt Integration** from the Sticky Personas menu
+3. Toggle **Zsh (~/.zshrc)**
+
+This adds `source ~/.config/git-personas/git-personas.zsh` to your `~/.zshrc`. Use `$(git_personas_prompt_info)` in your PROMPT. For example, with the robbyrussell theme:
 
 ```bash
-source ~/.config/git-personas/git-personas.zsh
+PROMPT='%F{blue}%~%f $(git_personas_prompt_info)%F{yellow}%(?:→ :✗ )%f '
 ```
 
-3. Use `$(git_personas_prompt_info)` in your PROMPT. For example, with the default robbyrussell theme:
+This will show `👤 persona-name` when a persona is active. The result is cached for 30 seconds. Works with or without oh-my-zsh.
 
-```bash
-PROMPT='%F{blue}%~%f $(git_personas_prompt_info)$(git_prompt_info)%F{yellow}%(?:→ :✗ )%f '
-```
+### Starship
 
-This will show `👤 persona-name` when a persona is active. The result is cached for 30 seconds to avoid reading the file on every prompt redraw.
+1. Run `git-personas`
+2. Select **🖥️ Shell Prompt Integration** from the Sticky Personas menu
+3. Toggle **⭐ Starship**
 
-**Without oh-my-zsh:** The snippet works standalone — just source it and use `$(git_personas_prompt_info)` in your custom PROMPT.
+This adds a `[custom.git_persona]` module to your `~/.config/starship.toml`. It uses a fast `sed`-based extraction script (no Python or heavy dependencies) and works with any shell that uses Starship.
+
+> **💡 Tip:** If you use Starship as your prompt, use this integration instead of Bash or Zsh — Starship takes over PS1 and the shell-specific integrations won't have any effect.
 
 ---
 
@@ -313,8 +334,33 @@ npm run build
 | `~/.config/git-personas/repo-personas.json` | Repo→persona sticky mappings |
 | `~/.config/git-personas/hooks/pre-commit` | Global pre-commit hook |
 | `~/.config/git-personas/hooks/pre-push` | Global pre-push hook |
-| `~/.config/git-personas/git-personas.zsh` | Shell prompt snippet |
+| `~/.config/git-personas/git-personas.bash` | Bash prompt snippet |
+| `~/.config/git-personas/git-personas.zsh` | Zsh prompt snippet |
+| `~/.config/git-personas/git-personas-starship.sh` | Starship persona extraction script |
+| `~/.config/starship.toml` | Managed `[custom.git_persona]` section (if Starship integration enabled) |
 | `~/.gitconfig` | Managed includeIf section (between markers) |
+
+---
+
+## 🗑️ Uninstall
+
+Remove all git-personas configuration, hooks, and shell integrations:
+
+```bash
+git-personas uninstall
+```
+
+This removes:
+- The managed section from `~/.gitconfig`
+- Global git hooks and `core.hooksPath`
+- Shell prompt integrations (bash, zsh, and Starship)
+- The entire `~/.config/git-personas/` directory (personas, configs, hooks, scripts)
+
+After running the uninstall command, remove the CLI itself:
+
+```bash
+npm uninstall -g git-personas
+```
 
 ---
 
