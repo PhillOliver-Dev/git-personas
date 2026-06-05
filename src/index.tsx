@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useInput, useApp } from 'ink';
 import type { Screen } from './types.js';
-import { loadStore, saveStore, ensureConfigDir, addPersona, updatePersona, getPersona, applyPersona } from './store.js';
+import { loadStore, saveStore, ensureConfigDir, addPersona, updatePersona, getPersona, applyPersona, importCurrentProfile } from './store.js';
 import MainScreen from './components/MainScreen.js';
 import PersonaForm from './components/PersonaForm.js';
 import EditSelectScreen from './components/EditSelectScreen.js';
@@ -21,7 +21,15 @@ export default function App() {
     }
   });
 
-  const store = loadStore();
+  // Load store once, importing current git profile on first launch
+  const store = useMemo(() => {
+    const loaded = loadStore();
+    const imported = importCurrentProfile(loaded);
+    if (imported !== loaded) {
+      saveStore(imported);
+    }
+    return imported;
+  }, []);
 
   switch (screen.type) {
     case 'main':

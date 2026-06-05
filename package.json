@@ -1,6 +1,6 @@
 {
   "name": "git-personas",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Terminal UI for managing git personas — switch between git identities with ease",
   "main": "dist/cli.js",
   "bin": {

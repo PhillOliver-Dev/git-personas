@@ -44,6 +44,59 @@ export function getRepoPersonasFile(): string {
   return REPO_PERSONAS_FILE;
 }
 
+export function getCurrentGitProfile(): Persona | null {
+  try {
+    const user = execSync('git config --global user.name', { encoding: 'utf-8' }).trim();
+    const email = execSync('git config --global user.email', { encoding: 'utf-8' }).trim();
+    if (!user || !email) return null;
+
+    let gpgKey: string | undefined;
+    try {
+      gpgKey = execSync('git config --global user.signingkey', { encoding: 'utf-8' }).trim() || undefined;
+    } catch {
+      // No signing key
+    }
+
+    let sshKey: string | undefined;
+    try {
+      const sshCmd = execSync('git config --global core.sshCommand', { encoding: 'utf-8' }).trim();
+      const match = sshCmd.match(/-i\s+(\S+)/);
+      if (match) sshKey = match[1];
+    } catch {
+      // No SSH command
+    }
+
+    let defaultBranch: string | undefined;
+    try {
+      defaultBranch = execSync('git config --global init.defaultBranch', { encoding: 'utf-8' }).trim() || undefined;
+    } catch {
+      // No default branch
+    }
+
+    return {
+      name: 'default',
+      user,
+      email,
+      gpgKey,
+      sshKey,
+      defaultBranch,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function importCurrentProfile(store: PersonaStore): PersonaStore {
+  // Already has personas — don't import
+  if (store.personas.length > 0) return store;
+
+  const profile = getCurrentGitProfile();
+  if (!profile) return store;
+
+  const updated = addPersona(profile, store);
+  return setActive(profile.name, updated);
+}
+
 export function ensureConfigDir(): void {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
 }
