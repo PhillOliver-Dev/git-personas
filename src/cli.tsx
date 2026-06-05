@@ -3,4 +3,8 @@ import React from 'react';
 import { render } from 'ink';
 import App from './index.js';
 
-render(React.createElement(App));
+const { waitUntilExit, clear } = render(React.createElement(App));
+
+waitUntilExit().then(() => {
+  clear();
+});
