@@ -16,8 +16,33 @@ export interface PersonaStore {
   active: string | null;
 }
 
+export interface PersonaSnapshot {
+  user: string;
+  email: string;
+  gpgKey?: string;
+  sshKey?: string;
+  defaultBranch?: string;
+}
+
+export interface RepoPersonaMapping {
+  persona: string;
+  snapshot: PersonaSnapshot;
+  lastApplied: string;
+}
+
+export type RepoPersonas = Record<string, RepoPersonaMapping>;
+
 const CONFIG_DIR = `${os.homedir()}/.config/git-personas`;
 const CONFIG_FILE = `${CONFIG_DIR}/personas.json`;
+const REPO_PERSONAS_FILE = `${CONFIG_DIR}/repo-personas.json`;
+
+export function getConfigDir(): string {
+  return CONFIG_DIR;
+}
+
+export function getRepoPersonasFile(): string {
+  return REPO_PERSONAS_FILE;
+}
 
 export function ensureConfigDir(): void {
   fs.mkdirSync(CONFIG_DIR, { recursive: true });
@@ -181,4 +206,56 @@ export function clearActivePersona(): void {
   for (const cmd of commands) {
     execSync(cmd, { stdio: 'pipe' });
   }
+}
+
+export function takeSnapshot(persona: Persona): PersonaSnapshot {
+  return {
+    user: persona.user,
+    email: persona.email,
+    gpgKey: persona.gpgKey,
+    sshKey: persona.sshKey,
+    defaultBranch: persona.defaultBranch,
+  };
+}
+
+export function getChangedFields(persona: Persona, snapshot: PersonaSnapshot): string[] {
+  const changes: string[] = [];
+  if (persona.user !== snapshot.user) changes.push('user.name');
+  if (persona.email !== snapshot.email) changes.push('user.email');
+  if (persona.gpgKey !== snapshot.gpgKey) changes.push('GPG key');
+  if (persona.sshKey !== snapshot.sshKey) changes.push('SSH key');
+  if (persona.defaultBranch !== snapshot.defaultBranch) changes.push('default branch');
+  return changes;
+}
+
+export function loadRepoPersonas(): RepoPersonas {
+  try {
+    const data = fs.readFileSync(REPO_PERSONAS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+export function saveRepoPersonas(repoPersonas: RepoPersonas): void {
+  ensureConfigDir();
+  fs.writeFileSync(REPO_PERSONAS_FILE, JSON.stringify(repoPersonas, null, 2));
+}
+
+export function setRepoPersona(repoPath: string, persona: Persona): RepoPersonas {
+  const repoPersonas = loadRepoPersonas();
+  repoPersonas[repoPath] = {
+    persona: persona.name,
+    snapshot: takeSnapshot(persona),
+    lastApplied: new Date().toISOString(),
+  };
+  saveRepoPersonas(repoPersonas);
+  return repoPersonas;
+}
+
+export function removeRepoPersona(repoPath: string): RepoPersonas {
+  const repoPersonas = loadRepoPersonas();
+  delete repoPersonas[repoPath];
+  saveRepoPersonas(repoPersonas);
+  return repoPersonas;
 }

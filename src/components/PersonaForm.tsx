@@ -32,7 +32,7 @@ export default function PersonaForm({ initial, onSubmit, onCancel, title }: Pers
 
   const currentStep = steps[step];
 
-  // Handle Escape for back navigation (handled by BackButton in select screens)
+  // Global Escape handler: go back a step or cancel
   useInput((_input, key) => {
     if (key.escape && !['gpg', 'ssh'].includes(currentStep)) {
       if (step > 0) {
@@ -73,6 +73,13 @@ export default function PersonaForm({ initial, onSubmit, onCancel, title }: Pers
     }
   });
 
+  // Escape handler for GPG/SSH select screens
+  useInput((_input, key) => {
+    if (key.escape && ['gpg', 'ssh'].includes(currentStep)) {
+      setStep(step - 1);
+    }
+  });
+
   if (currentStep === 'gpg') {
     const items = [
       { label: '(none — skip GPG signing)', value: '' },
@@ -87,7 +94,7 @@ export default function PersonaForm({ initial, onSubmit, onCancel, title }: Pers
         <Text dimColor>Current: {gpgKey || '(none)'}</Text>
         <Box marginTop={1} />
         <SelectInput items={items} onSelect={handleGpgSelect} />
-        <BackButton onBack={() => setStep(step - 1)} />
+        <BackButton />
       </Box>
     );
   }
@@ -106,7 +113,7 @@ export default function PersonaForm({ initial, onSubmit, onCancel, title }: Pers
         <Text dimColor>Current: {sshKey || '(none)'}</Text>
         <Box marginTop={1} />
         <SelectInput items={items} onSelect={handleSshSelect} />
-        <BackButton onBack={() => setStep(step - 1)} />
+        <BackButton />
       </Box>
     );
   }
@@ -166,7 +173,7 @@ export default function PersonaForm({ initial, onSubmit, onCancel, title }: Pers
         </Box>
       )}
 
-      <BackButton onBack={step > 0 ? () => setStep(step - 1) : onCancel} />
+      <BackButton />
     </Box>
   );
 }

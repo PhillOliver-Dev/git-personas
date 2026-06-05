@@ -8,6 +8,7 @@ import EditSelectScreen from './components/EditSelectScreen.js';
 import DeleteScreen from './components/DeleteScreen.js';
 import SwitchScreen from './components/SwitchScreen.js';
 import SuccessScreen from './components/SuccessScreen.js';
+import StickyPersonaScreen from './components/StickyPersonaScreen.js';
 
 export default function App() {
   const { exit } = useApp();
@@ -90,6 +91,9 @@ export default function App() {
 
     case 'switch':
       return <SwitchScreen store={store} onScreenChange={setScreen} />;
+
+    case 'sticky':
+      return <StickyPersonaScreen onScreenChange={setScreen} onQuit={exit} />;
 
     case 'success':
       return (

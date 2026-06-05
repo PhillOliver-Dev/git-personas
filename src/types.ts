@@ -6,6 +6,7 @@ export type Screen =
   | { type: 'edit'; name: string }
   | { type: 'delete' }
   | { type: 'switch' }
+  | { type: 'sticky' }
   | { type: 'success'; message: string };
 
 export type { Persona, PersonaStore };

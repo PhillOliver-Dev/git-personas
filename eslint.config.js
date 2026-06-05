@@ -32,4 +32,10 @@ export default tseslint.config(
       "object-curly-spacing": ["error", "always"],
     },
   },
+  {
+    files: ["src/hooks/**"],
+    rules: {
+      "no-console": "off",
+    },
+  },
 );

@@ -22,6 +22,10 @@ export default function DeleteScreen({ store, onScreenChange }: DeleteScreenProp
     onScreenChange({ type: 'success', message: `Deleted persona "${item.value}"` });
   };
 
+  useInput((_input, key) => {
+    if (key.escape) onScreenChange({ type: 'main' });
+  });
+
   if (store.personas.length === 0) {
     useInput((_input, key) => {
       if (key.return || key.escape) onScreenChange({ type: 'main' });
@@ -39,7 +43,7 @@ export default function DeleteScreen({ store, onScreenChange }: DeleteScreenProp
       <Text bold>🗑️ Select persona to delete</Text>
       <Box marginTop={1} />
       <SelectInput items={items} onSelect={onSelect} />
-      <BackButton onBack={() => onScreenChange({ type: 'main' })} />
+      <BackButton />
     </Box>
   );
 }

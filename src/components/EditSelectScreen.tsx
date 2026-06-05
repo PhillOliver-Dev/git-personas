@@ -19,6 +19,10 @@ export default function EditSelectScreen({ store, onScreenChange }: EditSelectSc
     onScreenChange({ type: 'edit', name: item.value });
   };
 
+  useInput((_input, key) => {
+    if (key.escape) onScreenChange({ type: 'main' });
+  });
+
   if (store.personas.length === 0) {
     useInput((_input, key) => {
       if (key.return || key.escape) onScreenChange({ type: 'main' });
@@ -36,7 +40,7 @@ export default function EditSelectScreen({ store, onScreenChange }: EditSelectSc
       <Text bold>✏️ Select persona to edit</Text>
       <Box marginTop={1} />
       <SelectInput items={items} onSelect={onSelect} />
-      <BackButton onBack={() => onScreenChange({ type: 'main' })} />
+      <BackButton />
     </Box>
   );
 }

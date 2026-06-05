@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import type { PersonaStore, Screen } from '../types.js';
 import { getPersona } from '../store.js';
+import { isStickyEnabled } from '../hooks/setup.js';
 
 interface MainScreenProps {
   store: PersonaStore;
@@ -12,12 +13,14 @@ interface MainScreenProps {
 
 export default function MainScreen({ store, onScreenChange, onQuit }: MainScreenProps) {
   const activePersona = store.active ? getPersona(store.active, store) : null;
+  const stickyEnabled = isStickyEnabled();
 
   const menuItems = [
     { label: '➕ Create Persona', value: 'create' },
     { label: '✏️  Edit Persona', value: 'edit' },
-    { label: '🗑️ Delete Persona', value: 'delete' },
+    { label: '🗑️  Delete Persona', value: 'delete' },
     { label: '🔄 Switch Persona', value: 'switch' },
+    { label: `📌 Sticky Personas ${stickyEnabled ? '(enabled)' : '(disabled)'}`, value: 'sticky' },
     { label: '🚪 Quit', value: 'quit' },
   ];
 
@@ -27,6 +30,7 @@ export default function MainScreen({ store, onScreenChange, onQuit }: MainScreen
       case 'edit': onScreenChange({ type: 'edit', name: '' }); break;
       case 'delete': onScreenChange({ type: 'delete' }); break;
       case 'switch': onScreenChange({ type: 'switch' }); break;
+      case 'sticky': onScreenChange({ type: 'sticky' }); break;
       case 'quit': onQuit(); break;
     }
   };

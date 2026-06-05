@@ -1,28 +1,14 @@
 import React from 'react';
-import { Box, useInput } from 'ink';
-import SelectInput from 'ink-select-input';
+import { Box, Text } from 'ink';
 
 interface BackButtonProps {
-  onBack: () => void;
   label?: string;
 }
 
-export default function BackButton({ onBack, label = '← Back' }: BackButtonProps) {
-  // Intercept Escape key globally for this component
-  useInput((_input, key) => {
-    if (key.escape) {
-      onBack();
-    }
-  });
-
-  const item = { label, value: '__back__' };
-
+export default function BackButton({ label = '← Back (Esc)' }: BackButtonProps) {
   return (
     <Box marginTop={1}>
-      <SelectInput
-        items={[item]}
-        onSelect={() => onBack()}
-      />
+      <Text dimColor>{label}</Text>
     </Box>
   );
 }
