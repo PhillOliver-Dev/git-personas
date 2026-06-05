@@ -99,9 +99,6 @@ export function getCurrentGitProfile(): Persona | null {
 }
 
 export function importCurrentProfile(store: PersonaStore): PersonaStore {
-  // Already has personas — don't import
-  if (store.personas.length > 0) return store;
-
   const profile = getCurrentGitProfile();
   if (!profile) return store;
 
