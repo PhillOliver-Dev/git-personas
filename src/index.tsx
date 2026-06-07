@@ -63,12 +63,12 @@ export default function App() {
     }
 
     case 'edit': {
-      if (!screen.name) {
+      if (!screen.personaName) {
         return (
           <EditSelectScreen store={store} onScreenChange={setScreen} />
         );
       }
-      const persona = getPersona(screen.name, store);
+      const persona = getPersona(screen.personaName, store);
       if (!persona) {
         return (
           <SuccessScreen
@@ -83,9 +83,9 @@ export default function App() {
           title={`✏️ Edit "${persona.name}"`}
           initial={persona}
           onSubmit={(updated) => {
-            const newStore = updatePersona(screen.name, updated, store);
+            const newStore = updatePersona(screen.personaName, updated, store);
             saveStore(newStore);
-            if (store.active === screen.name) {
+            if (store.active === screen.personaName) {
               applyPersona(updated);
             }
             setScreen({ type: 'success', message: `Updated persona "${persona.name}"` });
@@ -101,10 +101,10 @@ export default function App() {
     case 'switch':
       return <SwitchScreen store={store} onScreenChange={setScreen} />;
 
-    case 'sticky':
+    case 'sticky-persona':
       return <StickyPersonaScreen onScreenChange={setScreen} onQuit={exit} />;
 
-    case 'sticky-shell-prompt':
+    case 'shell-prompt':
       return <ShellPromptScreen onScreenChange={setScreen} onQuit={exit} />;
 
     case 'success':

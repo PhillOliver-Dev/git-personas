@@ -27,10 +27,10 @@ export default function MainScreen({ store, onScreenChange, onQuit }: MainScreen
   const onSelect = (item: { value: string }) => {
     switch (item.value) {
       case 'create': onScreenChange({ type: 'create' }); break;
-      case 'edit': onScreenChange({ type: 'edit', name: '' }); break;
-      case 'delete': onScreenChange({ type: 'delete' }); break;
+      case 'edit': onScreenChange({ type: 'edit', personaName: '', name: '' }); break;
+      case 'delete': onScreenChange({ type: 'delete', personaName: '', name: '' }); break;
       case 'switch': onScreenChange({ type: 'switch' }); break;
-      case 'sticky': onScreenChange({ type: 'sticky' }); break;
+      case 'sticky': onScreenChange({ type: 'sticky-persona' }); break;
       case 'quit': onQuit(); break;
     }
   };
@@ -44,7 +44,7 @@ export default function MainScreen({ store, onScreenChange, onQuit }: MainScreen
         <Box>
           <Text color="green">● Active: </Text>
           <Text bold>{activePersona.name}</Text>
-          <Text> ({activePersona.user} &lt;{activePersona.email}&gt;)</Text>
+          <Text> ({activePersona.user} {'<'}{activePersona.email}{'>'})</Text>
         </Box>
       ) : (
         <Text color="yellow">● No active persona</Text>
@@ -60,7 +60,7 @@ export default function MainScreen({ store, onScreenChange, onQuit }: MainScreen
               <Text>
                 {'  '}
                 {p.name === store.active ? '🟢' : '⚪'} {p.name}
-                <Text dimColor> — {p.user} &lt;{p.email}&gt;</Text>
+                <Text dimColor> — {p.user} {'<'}{p.email}{'>'}</Text>
               </Text>
             </Box>
           ))}

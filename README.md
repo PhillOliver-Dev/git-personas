@@ -16,6 +16,19 @@ If you work across multiple organisations, contribute to open source, or manage 
 
 `git-personas` lets you define named identities and switch between them instantly — including GPG signing keys, SSH keys, and default branch preferences.
 
+### What makes this different from just using `gitinclude`?
+
+1. **Interactive TUI** — Create, edit, delete, and switch personas with a beautiful terminal UI (no manual config editing)
+2. **Path-based auto-switch** — Automatically apply the right persona based on directory patterns (e.g., `~/work/**`, `~/personal/**`)
+3. **Safety features** — `status` command shows your effective identity, `diff` compares personas, `pin` locks a persona to a specific repo
+4. **Atomic writes with backups** — Your `~/.gitconfig` is never corrupted; automatic backups keep last 10 versions
+5. **Sticky personas** — Hooks remember which persona you used per-repo (optional)
+6. **Shell prompt integration** — See your active persona in bash/zsh/Starship prompts
+7. **Full CLI toolbox** — `switch`, `list`, `status`, `diff`, `pin`, `export`, `import`, `uninstall`
+8. **No manual editing** — Manage everything through the TUI or CLI commands
+
+While `gitinclude` is just a Git feature, `git-personas` is a complete identity management layer on top.
+
 ---
 
 ## Install
@@ -76,8 +89,23 @@ Then switch to it with **🔄 Switch Persona**.
 In addition to the interactive TUI, you can use git-personas from the command line:
 
 ```bash
+# Launch the interactive TUI (no args)
+git-personas
+
 # Switch persona without opening the TUI
 git-personas switch work
+
+# List all configured personas
+git-personas list
+
+# Show current git identity and active persona
+git-personas status
+
+# Pin a persona to the current repo (local override)
+git-personas pin work
+
+# Compare two personas
+git-personas diff work personal
 
 # Export personas to a file (or stdout)
 git-personas export
@@ -92,6 +120,34 @@ git-personas uninstall
 # Show help
 git-personas --help
 ```
+
+### CLI Commands
+
+| Command | Description |
+|---|---|
+| `git-personas` | Launch the interactive TUI |
+| `git-personas switch <name>` | Switch to a persona |
+| `git-personas list` | List all configured personas |
+| `git-personas status` | Show current git identity and active persona |
+| `git-personas pin <name>` | Pin a persona to the current repo (local override) |
+| `git-personas diff <a> <b>` | Compare two personas |
+| `git-personas export [file]` | Export personas to JSON file or stdout |
+| `git-personas import <file>` | Import personas from a JSON file |
+| `git-personas uninstall` | Remove all git-personas config |
+| `git-personas --help` | Show help message |
+
+### Git Subcommand
+
+You can also use `git-persona` (singular) which installs as a git subcommand:
+
+```bash
+# After installing, these work:
+git persona switch work
+git persona status
+git persona list
+```
+
+This works automatically once `git-personas` is installed and on your `PATH`.
 
 ---
 

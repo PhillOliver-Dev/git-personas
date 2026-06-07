@@ -16,7 +16,7 @@ export default function EditSelectScreen({ store, onScreenChange }: EditSelectSc
   }));
 
   const onSelect = (item: { value: string }) => {
-    onScreenChange({ type: 'edit', name: item.value });
+    onScreenChange({ type: 'edit', name: item.value, personaName: item.value });
   };
 
   useInput((_input, key) => {

@@ -21,7 +21,7 @@ _git_personas_read() {
   now=$(date +%s)
 
   if (( now - _git_personas_cached_time < GIT_PERSONAS_CACHE_TTL )); then
-    echo "$_git_personas_cached_result"
+    printf '%s' "$_git_personas_cached_result"
     return
   fi
 
@@ -29,30 +29,17 @@ _git_personas_read() {
   if [[ ! -f "$config_file" ]]; then
     _git_personas_cached_result=""
     _git_personas_cached_time=$now
-    echo ""
+    printf ''
     return
   fi
 
+  # Extract the value of "active" using sed (fast, no dependencies)
   local active
-  active=$(python3 -c "
-import json, sys
-try:
-    with open('${config_file}') as f:
-        data = json.load(f)
-    active = data.get('active')
-    if active and data.get('personas'):
-        for p in data['personas']:
-            if p['name'] == active:
-                print(p['name'])
-                sys.exit(0)
-    print('')
-except Exception:
-    print('')
-" 2>/dev/null)
+  active=$(sed -n 's/.*"active"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$config_file")
 
   _git_personas_cached_result="${active}"
   _git_personas_cached_time=$now
-  echo "$active"
+  printf '%s' "$active"
 }
 
 # Print the persona prompt segment
@@ -62,9 +49,9 @@ git_personas_prompt_info() {
   persona=$(_git_personas_read)
 
   if [[ -n "$persona" ]]; then
-    echo "\033[36m👤 ${persona}\033[0m "
+    printf '\033[36m👤 %s\033[0m ' "$persona"
   else
-    echo ""
+    printf ''
   fi
 }
 

@@ -1,7 +1,8 @@
-import { execSync } from 'child_process';
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 
+// Re-export types
 export interface Persona {
   name: string;
   user: string;
@@ -32,78 +33,61 @@ export interface RepoPersonaMapping {
 
 export type RepoPersonas = Record<string, RepoPersonaMapping>;
 
-const CONFIG_DIR = `${os.homedir()}/.config/git-personas`;
-const CONFIG_FILE = `${CONFIG_DIR}/personas.json`;
-const REPO_PERSONAS_FILE = `${CONFIG_DIR}/repo-personas.json`;
-const PERSONAS_CONFIG_DIR = `${CONFIG_DIR}/personas`;
-const GITCONFIG_PATH = `${os.homedir()}/.gitconfig`;
-const MANAGED_SECTION_START = '# === BEGIN git-personas managed config ===';
-const MANAGED_SECTION_END = '# === END git-personas managed config ===';
+export interface PathMapping {
+  path: string;
+  persona: string;
+}
+
+export type PathMappings = PathMapping[];
+
+// Import from lib modules
+import {
+  CONFIG_DIR,
+  PERSONAS_CONFIG_DIR,
+  PERSONAS_FILE,
+  REPO_PERSONAS_FILE,
+  PATH_MAPPINGS_FILE,
+} from './lib/paths.js';
+
+import {
+  readGitConfig,
+  getCurrentGitProfile,
+} from './lib/git.js';
+
+import {
+  writeManagedSection,
+  removeManagedSection,
+  readGitconfigContent,
+  writeGitconfigContent,
+  backupGitconfig,
+} from './lib/gitconfig.js';
+
+import {
+  writePersonaConfigFile as writePersonaConfigFileInternal,
+  deletePersonaConfigFile as deletePersonaConfigFileInternal,
+} from './lib/persona-config.js';
+
+import {
+  takeSnapshot as takeSnapshotInternal,
+  getChangedFields,
+} from './lib/snapshot.js';
+
+import { GITCONFIG_PATH } from './lib/paths.js';
+
+// Re-export lib functions for backward compatibility
+export { readGitConfig, readGitconfigContent, removeManagedSection };
+export { takeSnapshot as takeSnapshotInternal, getChangedFields };
+export { writePersonaConfigFileInternal as writePersonaConfigFile, deletePersonaConfigFileInternal as deletePersonaConfigFile };
+export { CONFIG_DIR, PERSONAS_CONFIG_DIR, PERSONAS_FILE, REPO_PERSONAS_FILE, PATH_MAPPINGS_FILE };
+
+// --- Store management ---
 
 export function getConfigDir(): string {
   return CONFIG_DIR;
 }
 
-export function getRepoPersonasFile(): string {
-  return REPO_PERSONAS_FILE;
-}
-
 export function getPersonasConfigDir(): string {
   return PERSONAS_CONFIG_DIR;
-}
-
-function configFileName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, '_');
-}
-
-export function getCurrentGitProfile(): Persona | null {
-  try {
-    const user = execSync('git config --global user.name', { encoding: 'utf-8' }).trim();
-    const email = execSync('git config --global user.email', { encoding: 'utf-8' }).trim();
-    if (!user || !email) return null;
-
-    let gpgKey: string | undefined;
-    try {
-      gpgKey = execSync('git config --global user.signingkey', { encoding: 'utf-8' }).trim() || undefined;
-    } catch {
-      // No signing key
-    }
-
-    let sshKey: string | undefined;
-    try {
-      const sshCmd = execSync('git config --global core.sshCommand', { encoding: 'utf-8' }).trim();
-      const match = sshCmd.match(/-i\s+(\S+)/);
-      if (match) sshKey = match[1];
-    } catch {
-      // No SSH command
-    }
-
-    let defaultBranch: string | undefined;
-    try {
-      defaultBranch = execSync('git config --global init.defaultBranch', { encoding: 'utf-8' }).trim() || undefined;
-    } catch {
-      // No default branch
-    }
-
-    return {
-      name: 'default',
-      user,
-      email,
-      gpgKey,
-      sshKey,
-      defaultBranch,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export function importCurrentProfile(store: PersonaStore): PersonaStore {
-  const profile = getCurrentGitProfile();
-  if (!profile) return store;
-
-  const updated = addPersona(profile, store);
-  return setActive(profile.name, updated);
 }
 
 export function ensureConfigDir(): void {
@@ -112,7 +96,7 @@ export function ensureConfigDir(): void {
 
 export function loadStore(): PersonaStore {
   try {
-    const data = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    const data = fs.readFileSync(PERSONAS_FILE, 'utf-8');
     return JSON.parse(data);
   } catch {
     return { personas: [], active: null };
@@ -121,7 +105,7 @@ export function loadStore(): PersonaStore {
 
 export function saveStore(store: PersonaStore): void {
   ensureConfigDir();
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(store, null, 2));
+  fs.writeFileSync(PERSONAS_FILE, JSON.stringify(store, null, 2));
 }
 
 export function getPersona(name: string, store: PersonaStore): Persona | undefined {
@@ -136,6 +120,9 @@ export function addPersona(persona: Persona, store: PersonaStore): PersonaStore 
 }
 
 export function updatePersona(name: string, updates: Partial<Persona>, store: PersonaStore): PersonaStore {
+  if (updates.name !== undefined && updates.name !== name) {
+    throw new Error('Cannot rename persona. Use delete and recreate to change the name.');
+  }
   return {
     ...store,
     personas: store.personas.map((p) =>
@@ -155,6 +142,21 @@ export function deletePersona(name: string, store: PersonaStore): PersonaStore {
 export function setActive(name: string | null, store: PersonaStore): PersonaStore {
   return { ...store, active: name };
 }
+
+export function importCurrentProfile(store: PersonaStore): PersonaStore {
+  const profile = getCurrentGitProfile();
+  if (!profile) return store;
+
+  // If a persona with this name already exists, don't re-add it
+  if (getPersona(profile.name, store)) {
+    return store;
+  }
+
+  const updated = addPersona(profile, store);
+  return setActive(profile.name, updated);
+}
+
+// --- Key detection ---
 
 export interface GitKeys {
   gpgKeys: GpgKey[];
@@ -219,124 +221,7 @@ export function detectSshKeys(): SshKey[] {
   }
 }
 
-// --- includeIf-based persona config management ---
-
-export function writePersonaConfigFile(name: string, persona: Persona): void {
-  ensureConfigDir();
-  fs.mkdirSync(PERSONAS_CONFIG_DIR, { recursive: true });
-
-  const lines: string[] = [];
-
-  lines.push('[user]');
-  lines.push(`\tname = ${persona.user}`);
-  lines.push(`\temail = ${persona.email}`);
-
-  if (persona.gpgKey) {
-    lines.push(`\tsigningkey = ${persona.gpgKey}`);
-  }
-
-  if (persona.gpgKey) {
-    lines.push('');
-    lines.push('[commit]');
-    lines.push('\tgpgsign = true');
-  }
-
-  if (persona.sshKey) {
-    lines.push('');
-    lines.push('[core]');
-    lines.push(`\tsshCommand = ssh -i ${persona.sshKey} -o IdentitiesOnly=yes`);
-  }
-
-  if (persona.defaultBranch) {
-    lines.push('');
-    lines.push('[init]');
-    lines.push(`\tdefaultBranch = ${persona.defaultBranch}`);
-  }
-
-  const configPath = `${PERSONAS_CONFIG_DIR}/${configFileName(name)}.config`;
-  fs.writeFileSync(configPath, lines.join('\n') + '\n');
-}
-
-export function deletePersonaConfigFile(name: string): void {
-  const configPath = `${PERSONAS_CONFIG_DIR}/${configFileName(name)}.config`;
-  try {
-    fs.rmSync(configPath, { force: true });
-  } catch {
-    // File doesn't exist or can't be deleted — ignore
-  }
-}
-
-function removeManagedSection(gitconfig: string): string {
-  const startIdx = gitconfig.indexOf(MANAGED_SECTION_START);
-  const endIdx = gitconfig.indexOf(MANAGED_SECTION_END);
-
-  if (startIdx === -1 || endIdx === -1) {
-    return gitconfig;
-  }
-
-  const before = gitconfig.substring(0, startIdx);
-  const after = gitconfig.substring(endIdx + MANAGED_SECTION_END.length);
-
-  // Collapse multiple blank lines that result from removal
-  return (before + after).replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
-}
-
-function updateGitconfigIncludesForPersona(personaName: string): void {
-  const sanitisedName = configFileName(personaName);
-  const configPath = `~/.config/git-personas/personas/${sanitisedName}.config`;
-
-  let gitconfig = '';
-  try {
-    gitconfig = fs.readFileSync(GITCONFIG_PATH, 'utf-8');
-  } catch {
-    // File doesn't exist yet — that's fine
-  }
-
-  // Remove any existing managed section
-  gitconfig = removeManagedSection(gitconfig);
-
-  // Build the new managed section
-  const section = [
-    '',
-    MANAGED_SECTION_START,
-    `# Active persona: ${personaName}`,
-    `# Managed by git-personas — do not edit between markers`,
-    '',
-    `[includeIf "gitdir:~/"]`,
-    `\tpath = ${configPath}`,
-    '',
-    MANAGED_SECTION_END,
-  ].join('\n');
-
-  const content = gitconfig.trimEnd() + '\n' + section + '\n';
-  fs.writeFileSync(GITCONFIG_PATH, content);
-}
-
-function readGitconfigContent(): string | null {
-  try {
-    return fs.readFileSync(GITCONFIG_PATH, 'utf-8');
-  } catch {
-    return null;
-  }
-}
-
-function removeGitconfigManagedSection(): void {
-  const gitconfigContent = readGitconfigContent();
-  if (gitconfigContent === null) return;
-
-  const cleaned = removeManagedSection(gitconfigContent);
-  // If there's nothing left, remove the file entirely
-  if (cleaned.trim() === '') {
-    try {
-      fs.rmSync(GITCONFIG_PATH);
-    } catch {
-      // Ignore
-    }
-    return;
-  }
-
-  fs.writeFileSync(GITCONFIG_PATH, cleaned);
-}
+// --- Persona application ---
 
 function cleanupDirectGitConfig(): void {
   const unsetCommands = [
@@ -359,42 +244,102 @@ function cleanupDirectGitConfig(): void {
 
 export function applyPersona(persona: Persona): void {
   // 1. Write the persona config file
-  writePersonaConfigFile(persona.name, persona);
+  writePersonaConfigFileInternal(persona.name, persona);
 
   // 2. Clean up old direct git config values (migration from pre-includeIf system)
   cleanupDirectGitConfig();
 
-  // 3. Update the includeIf block in ~/.gitconfig to point to this persona
-  updateGitconfigIncludesForPersona(persona.name);
+  // 3. Update the includeIf block in ~/.gitconfig
+  writeManagedSection({ activePersona: persona.name });
 }
 
 export function clearActivePersona(): void {
   // 1. Clean up old direct git config values
   cleanupDirectGitConfig();
 
-  // 2. Remove the includeIf managed section from ~/.gitconfig
-  removeGitconfigManagedSection();
+  // 2. Remove the managed section from ~/.gitconfig
+  const gitconfigContent = readGitconfigContent();
+  if (gitconfigContent === null) return;
+
+  const cleaned = removeManagedSection(gitconfigContent);
+  // If there's nothing left, remove the file entirely
+  if (cleaned.trim() === '') {
+    try {
+      backupGitconfig();
+      fs.rmSync(GITCONFIG_PATH);
+    } catch {
+      // Ignore
+    }
+    return;
+  }
+
+  writeGitconfigContent(cleaned);
 }
+
+// --- Path-based auto-switch ---
+
+export function loadPathMappings(): PathMappings {
+  try {
+    const data = fs.readFileSync(PATH_MAPPINGS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+export function savePathMappings(mappings: PathMappings): void {
+  ensureConfigDir();
+  fs.writeFileSync(PATH_MAPPINGS_FILE, JSON.stringify(mappings, null, 2));
+}
+
+export function addPathMapping(path: string, persona: string): PathMappings {
+  const mappings = loadPathMappings();
+  
+  const existingIndex = mappings.findIndex((m) => m.path === path);
+  if (existingIndex >= 0) {
+    mappings[existingIndex].persona = persona;
+  } else {
+    mappings.push({ path, persona });
+  }
+  
+  savePathMappings(mappings);
+  return mappings;
+}
+
+export function removePathMapping(path: string): PathMappings {
+  const mappings = loadPathMappings().filter((m) => m.path !== path);
+  savePathMappings(mappings);
+  return mappings;
+}
+
+export function updateGitconfigWithPathMappings(mappings: PathMappings, activePersona: string | null): void {
+  writeManagedSection({ activePersona, pathMappings: mappings });
+}
+
+export function getEffectivePersonaForPath(repoPath: string, mappings: PathMappings): string | null {
+  const sortedMappings = [...mappings].sort((a, b) => {
+    const aDepth = a.path.split('/').length;
+    const bDepth = b.path.split('/').length;
+    return bDepth - aDepth;
+  });
+
+  for (const mapping of sortedMappings) {
+    const pattern = mapping.path.replace('gitdir:', '').replace(/^"(.*)"$/, '$1');
+    const expandedPattern = pattern.replace(/^~/, os.homedir());
+    if (repoPath.startsWith(expandedPattern) || repoPath.startsWith(expandedPattern.replace('**', ''))) {
+      return mapping.persona;
+    }
+  }
+  return null;
+}
+
+// --- Snapshot and diff ---
 
 export function takeSnapshot(persona: Persona): PersonaSnapshot {
-  return {
-    user: persona.user,
-    email: persona.email,
-    gpgKey: persona.gpgKey,
-    sshKey: persona.sshKey,
-    defaultBranch: persona.defaultBranch,
-  };
+  return takeSnapshotInternal(persona);
 }
 
-export function getChangedFields(persona: Persona, snapshot: PersonaSnapshot): string[] {
-  const changes: string[] = [];
-  if (persona.user !== snapshot.user) changes.push('user.name');
-  if (persona.email !== snapshot.email) changes.push('user.email');
-  if (persona.gpgKey !== snapshot.gpgKey) changes.push('GPG key');
-  if (persona.sshKey !== snapshot.sshKey) changes.push('SSH key');
-  if (persona.defaultBranch !== snapshot.defaultBranch) changes.push('default branch');
-  return changes;
-}
+// --- Repo personas ---
 
 export function loadRepoPersonas(): RepoPersonas {
   try {

@@ -40,23 +40,9 @@ _git_personas_read() {
     return
   fi
 
-  # Extract active persona name using basic string manipulation (no jq dependency)
+  # Extract the value of "active" using sed (fast, no dependencies)
   local active
-  active=$(python3 -c "
-import json, sys
-try:
-    with open('${config_file}') as f:
-        data = json.load(f)
-    active = data.get('active')
-    if active and data.get('personas'):
-        for p in data['personas']:
-            if p['name'] == active:
-                print(p['name'])
-                sys.exit(0)
-    print('')
-except Exception:
-    print('')
-" 2>/dev/null)
+  active=$(sed -n 's/.*"active"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$config_file")
 
   _git_personas_cached_result="${active}"
   _git_personas_cached_time=$now

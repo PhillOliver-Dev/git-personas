@@ -36,14 +36,12 @@ export default function SwitchScreen({ store, onScreenChange }: SwitchScreenProp
     }
   };
 
+  // Always call hooks before conditional returns
   useInput((_input, key) => {
     if (key.escape) onScreenChange({ type: 'main' });
   });
 
   if (store.personas.length === 0) {
-    useInput((_input, key) => {
-      if (key.return || key.escape) onScreenChange({ type: 'main' });
-    });
     return (
       <Box padding={1}>
         <Text>No personas to switch to.</Text>

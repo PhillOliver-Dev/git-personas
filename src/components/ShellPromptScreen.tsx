@@ -41,7 +41,7 @@ export default function ShellPromptScreen({ onScreenChange, onQuit }: ShellPromp
         <SelectInput
           items={items}
           onSelect={(item) => {
-            if (item.value === 'back') onScreenChange({ type: 'sticky' });
+            if (item.value === 'back') onScreenChange({ type: 'sticky-persona' });
           }}
         />
       </Box>
@@ -79,7 +79,7 @@ export default function ShellPromptScreen({ onScreenChange, onQuit }: ShellPromp
   };
 
   useInput((_input, key) => {
-    if (key.escape) onScreenChange({ type: 'sticky' });
+    if (key.escape) onScreenChange({ type: 'sticky-persona' });
   });
 
   return (

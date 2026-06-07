@@ -24,7 +24,7 @@ export default function StickyPersonaScreen({ onScreenChange, onQuit }: StickyPe
 
     const onSelect = (item: { value: string }) => {
       switch (item.value) {
-        case 'shell-prompt': onScreenChange({ type: 'sticky-shell-prompt' }); break;
+        case 'shell-prompt': onScreenChange({ type: 'shell-prompt', subtype: 'sticky' }); break;
         case 'disable': {
           try {
             uninstallStickyHooks();

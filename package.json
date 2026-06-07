@@ -4,7 +4,8 @@
   "description": "Terminal UI for managing git personas — switch between git identities with ease",
   "main": "dist/cli.js",
   "bin": {
-    "git-personas": "dist/cli.js"
+    "git-personas": "dist/cli.js",
+    "git-persona": "dist/cli.js"
   },
   "files": [
     "dist"
